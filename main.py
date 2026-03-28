@@ -1,238 +1,221 @@
+"""
+main.py
+Punto de entrada de GoldStar Coffee – Client Management.
+
+Arquitectura:
+  main.py              → ventana principal + orquestación de pestañas
+  odoo_service.py      → capa de acceso a datos (XML-RPC)
+  workers.py           → QThread workers (operaciones asíncronas)
+  styles.py            → constantes de estilos
+  tab_busqueda.py      → pestaña Búsqueda y Listado
+  tab_formulario.py    → pestaña Crear / Editar contacto
+  tab_dashboard.py     → pestaña Dashboard con estadísticas
+  .env                 → credenciales (NO se sube al repositorio)
+"""
 import sys
-import xmlrpc.client
-from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QLineEdit, QPushButton, QLabel, QGroupBox, 
-                             QTabWidget, QTableWidget, QTableWidgetItem, 
-                             QHeaderView, QMessageBox, QListWidget, QAbstractItemView, QGraphicsDropShadowEffect)
+import os
+
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
+    QLabel, QTabWidget, QMessageBox, QStatusBar,
+    QGraphicsDropShadowEffect,
+)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor
 
+# Carga de variables de entorno desde .env (python-dotenv opcional)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass   # Si no está instalado, usa variables de sistema directamente
+
+import styles
+from odoo_service import OdooService, OdooConfig
+from workers import ConnectWorker
+from tab_busqueda import TabBusqueda
+from tab_formulario import TabFormulario
+from tab_dashboard import TabDashboard
+
+
+def _load_config() -> OdooConfig:
+    """Lee las credenciales desde variables de entorno."""
+    url      = os.getenv("ODOO_URL",      "")
+    db       = os.getenv("ODOO_DB",       "")
+    username = os.getenv("ODOO_USERNAME", "")
+    api_key  = os.getenv("ODOO_API_KEY",  "")
+
+    missing = [k for k, v in {
+        "ODOO_URL": url, "ODOO_DB": db,
+        "ODOO_USERNAME": username, "ODOO_API_KEY": api_key,
+    }.items() if not v]
+
+    if missing:
+        raise EnvironmentError(
+            f"Faltan variables de entorno: {', '.join(missing)}\n"
+            "Crea un archivo .env con las claves necesarias."
+        )
+    return OdooConfig(url=url, db=db, username=username, api_key=api_key)
+
+
+# ──────────────────────────────────────────────────────────────────────────── #
+
 class GoldStarApp(QWidget):
+    # Índices de pestañas fijas
+    TAB_SEARCH  = 0
+    TAB_DASH    = 1
+    TAB_CREATE  = 2
+    TAB_EDIT    = 3   # dinámica (se crea al editar)
+
     def __init__(self):
         super().__init__()
-        
-        # --- CONFIGURACIÓN DE ODOO ---
-        self.url = "https://multiservicios-especializados.odoo.com"
-        self.db = "multiservicios-especializados"
-        self.username = "carlos.efrain.rosas.medina@gmail.com"
-        self.api_key = "33924b5d46d4196877c5fcea4d0cb8a325491b7e"
-        
-        self.uid = None
-        self.models = None
-        self.diccionario_empresas = {}
+        try:
+            config = _load_config()
+        except EnvironmentError as exc:
+            QMessageBox.critical(None, "Configuración faltante", str(exc))
+            sys.exit(1)
 
-        self.initUI()
-        self.conectar_odoo_automatico()
+        self._service   = OdooService(config)
+        self._companies = []
+        self._connect_worker = None
+        self._edit_tab_index = -1   # índice de pestaña de edición activa
 
-    def apply_shadow(self, widget):
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(15)
-        shadow.setXOffset(0)
-        shadow.setYOffset(4)
-        shadow.setColor(QColor(0, 0, 0, 30))
-        widget.setGraphicsEffect(shadow)
+        self._build_ui()
+        self._connect_odoo()
 
-    def initUI(self):
-        self.setWindowTitle('GoldStar Coffee - Client Management')
-        self.showMaximized() 
-        # Fondo general más suave
-        self.setStyleSheet("""
-            QWidget { background-color: #f8f9fa; font-family: 'Segoe UI', Arial; }
-            QGroupBox { 
-                border: 1px solid #e0e0e0; 
-                border-radius: 12px; 
-                margin-top: 20px; 
-                background-color: white; 
-                font-weight: bold; 
-                font-size: 15px;
-                color: #444;
-            }
-            QGroupBox::title { subcontrol-origin: margin; left: 15px; padding: 0 5px; }
-        """) 
+    # ------------------------------------------------------------------ #
+    #  UI principal                                                        #
+    # ------------------------------------------------------------------ #
+    def _build_ui(self):
+        self.setWindowTitle("GoldStar Coffee – Client Management")
+        self.showMaximized()
+        self.setStyleSheet(styles.APP_STYLE)
 
-        layout_principal = QVBoxLayout(self)
-        layout_principal.setContentsMargins(40, 30, 40, 40)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(32, 24, 32, 24)
+        root.setSpacing(12)
 
-        # Header elegante
-        header = QLabel("Sistema de Gestión de Clientes")
-        header.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
-        header.setStyleSheet("color: #1a1a1a; margin-bottom: 10px;")
-        layout_principal.addWidget(header)
+        # ── Header ──────────────────────────────────────────────────────
+        header_row = QHBoxLayout()
 
-        # Tabs
+        logo_lbl = QLabel("☕")
+        logo_lbl.setStyleSheet("font-size: 40px;")
+
+        title_col = QVBoxLayout()
+        title_col.setSpacing(0)
+        app_title = QLabel("GoldStar Coffee")
+        app_title.setFont(QFont("Segoe UI", 26, QFont.Weight.Bold))
+        app_title.setStyleSheet(f"color: {styles.TEXT_MAIN};")
+        sub_title = QLabel("Sistema de Gestión de Clientes")
+        sub_title.setStyleSheet("color: #777; font-size: 13px;")
+        title_col.addWidget(app_title)
+        title_col.addWidget(sub_title)
+
+        self.lbl_status = QLabel("⏳ Conectando…")
+        self.lbl_status.setStyleSheet(
+            "color: #888; font-size: 12px; padding: 6px 14px;"
+            "background: #f0f0f0; border-radius: 20px;"
+        )
+
+        header_row.addWidget(logo_lbl)
+        header_row.addSpacing(10)
+        header_row.addLayout(title_col)
+        header_row.addStretch()
+        header_row.addWidget(self.lbl_status)
+        root.addLayout(header_row)
+
+        # ── Tabs ────────────────────────────────────────────────────────
         self.tabs = QTabWidget()
-        self.tabs.setStyleSheet("""
-            QTabWidget::pane { border: none; background: transparent; }
-            QTabBar::tab { 
-                background: #e9ecef; padding: 12px 40px; 
-                font-weight: bold; font-size: 13px; border-top-left-radius: 8px; border-top-right-radius: 8px;
-                color: #666; margin-right: 4px;
-            }
-            QTabBar::tab:selected { background: white; color: #0078d4; }
-        """)
+        self.tabs.setStyleSheet(styles.TAB_STYLE)
 
-        self.tabs.addTab(self.create_tab_busqueda(), "🔍 BÚSQUEDA Y LISTADO")
-        layout_principal.addWidget(self.tabs)
+        self._tab_search = TabBusqueda(self._service, self._open_edit_tab)
+        self._tab_dash   = TabDashboard(self._service)
 
-    def create_tab_busqueda(self):
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-        layout.setContentsMargins(10, 20, 10, 10)
+        self._tab_create = TabFormulario(self._service, self._companies)
+        self._tab_create.saved.connect(self._on_create_saved)
 
-        # --- PANEL DE CONTROL (FILTROS) ---
-        filter_card = QGroupBox("Panel de Control")
-        self.apply_shadow(filter_card)
-        
-        filter_layout = QHBoxLayout()
-        filter_layout.setContentsMargins(20, 25, 20, 25)
-        filter_layout.setSpacing(30)
+        self.tabs.addTab(self._tab_search, "🔍  Búsqueda")
+        self.tabs.addTab(self._tab_dash,   "📊  Dashboard")
+        self.tabs.addTab(self._tab_create, "➕  Nuevo Contacto")
 
-        # Selector de Compañías
-        empresa_container = QVBoxLayout()
-        lbl_empresa = QLabel("🏢 Compañías")
-        lbl_empresa.setStyleSheet("font-weight: bold; color: #555;")
-        self.listado_empresas = QListWidget()
-        self.listado_empresas.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
-        self.listado_empresas.setFixedHeight(120)
-        self.listado_empresas.setStyleSheet("""
-            QListWidget { 
-                border: 1px solid #ddd; border-radius: 8px; background: #fff; padding: 5px; 
-            }
-            QListWidget::item { padding: 8px; border-radius: 4px; }
-            QListWidget::item:selected { background-color: #e7f3ff; color: #0078d4; }
-        """)
-        empresa_container.addWidget(lbl_empresa)
-        empresa_container.addWidget(self.listado_empresas)
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+        root.addWidget(self.tabs)
 
-        # Buscador Central
-        busqueda_container = QVBoxLayout()
-        lbl_search = QLabel("🔎 Búsqueda Rápida")
-        lbl_search.setStyleSheet("font-weight: bold; color: #555;")
-        self.input_search = QLineEdit()
-        self.input_search.setPlaceholderText("Nombre, Email o Teléfono...")
-        self.input_search.setFixedHeight(45)
-        self.input_search.setStyleSheet("""
-            QLineEdit { 
-                padding: 0 15px; border: 2px solid #eee; border-radius: 10px; 
-                background: #fdfdfd; font-size: 14px;
-            }
-            QLineEdit:focus { border: 2px solid #0078d4; background: white; }
-        """)
-        busqueda_container.addWidget(lbl_search)
-        busqueda_container.addWidget(self.input_search)
-        busqueda_container.addStretch()
+    # ------------------------------------------------------------------ #
+    #  Conexión a Odoo                                                     #
+    # ------------------------------------------------------------------ #
+    def _connect_odoo(self):
+        self._connect_worker = ConnectWorker(self._service)
+        self._connect_worker.success.connect(self._on_connected)
+        self._connect_worker.error.connect(self._on_connect_error)
+        self._connect_worker.start()
 
-        # Botones de Acción
-        botones_container = QVBoxLayout()
-        botones_container.addSpacing(25) # Alineación con los inputs
-        
-        self.btn_search = QPushButton("BUSCAR")
-        self.btn_search.setFixedHeight(45)
-        self.btn_search.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_search.setStyleSheet(self.get_button_style("#0078d4", "#005a9e"))
-        self.btn_search.clicked.connect(self.ejecutar_busqueda)
+    def _on_connected(self, uid: int, companies: list[dict]):
+        self._companies = companies
+        self._tab_search.set_companies(companies)
 
-        self.btn_clear = QPushButton("LIMPIAR")
-        self.btn_clear.setFixedHeight(45)
-        self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_clear.setStyleSheet(self.get_button_style("#6c757d", "#495057"))
-        self.btn_clear.clicked.connect(self.limpiar_busqueda)
-        
-        botones_container.addWidget(self.btn_search)
-        botones_container.addWidget(self.btn_clear)
+        # Reconstruir la pestaña de creación con compañías cargadas
+        self.tabs.removeTab(self.TAB_CREATE)
+        self._tab_create = TabFormulario(self._service, self._companies)
+        self._tab_create.saved.connect(self._on_create_saved)
+        self.tabs.insertTab(self.TAB_CREATE, self._tab_create, "➕  Nuevo Contacto")
 
-        filter_layout.addLayout(empresa_container, stretch=3)
-        filter_layout.addLayout(busqueda_container, stretch=4)
-        filter_layout.addLayout(botones_container, stretch=2)
-        filter_card.setLayout(filter_layout)
-        
-        layout.addWidget(filter_card)
+        self.lbl_status.setText(f"✅  Conectado  (UID {uid})")
+        self.lbl_status.setStyleSheet(
+            "color: #107c10; font-size: 12px; font-weight: bold;"
+            "padding: 6px 14px; background: #e8f5e9; border-radius: 20px;"
+        )
 
-        # --- TABLA DE RESULTADOS ---
-        self.table = QTableWidget()
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["ID", "Nombre", "Email", "Teléfono", "Ciudad", "Empresa"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setAlternatingRowColors(True)
-        self.table.verticalHeader().setVisible(False)
-        self.table.setStyleSheet("""
-            QTableWidget { 
-                background-color: white; border: 1px solid #e0e0e0; border-radius: 12px; 
-                gridline-color: #f0f0f0; alternate-background-color: #fafafa;
-            }
-            QHeaderView::section { 
-                background-color: #f8f9fa; padding: 12px; border: none;
-                border-bottom: 2px solid #eee; font-weight: bold; color: #444;
-            }
-            QTableWidget::item { padding: 10px; border-bottom: 1px solid #f0f0f0; color: #333; }
-            QTableWidget::item:selected { background-color: #e7f3ff; color: #000; }
-        """)
-        
-        layout.addSpacing(20)
-        layout.addWidget(self.table)
-        return widget
+    def _on_connect_error(self, msg: str):
+        self.lbl_status.setText("❌  Sin conexión")
+        self.lbl_status.setStyleSheet(
+            "color: #d13438; font-size: 12px; font-weight: bold;"
+            "padding: 6px 14px; background: #fde8e8; border-radius: 20px;"
+        )
+        QMessageBox.critical(self, "Error de Conexión", msg)
 
-    def get_button_style(self, color, hover_color):
-        return f"""
-            QPushButton {{
-                background-color: {color}; color: white; border-radius: 10px;
-                font-weight: bold; font-size: 13px; border: none;
-            }}
-            QPushButton:hover {{ background-color: {hover_color}; }}
-            QPushButton:pressed {{ background-color: {color}; margin-top: 2px; }}
-        """
+    # ------------------------------------------------------------------ #
+    #  Navegación entre pestañas                                           #
+    # ------------------------------------------------------------------ #
+    def _on_tab_changed(self, index: int):
+        if index == self.TAB_DASH:
+            self._tab_dash.load_stats()
 
-    # --- LÓGICA DE ODOO ---
-    def conectar_odoo_automatico(self):
-        try:
-            common = xmlrpc.client.ServerProxy(f'{self.url}/xmlrpc/2/common')
-            uid = common.authenticate(self.db, self.username, self.api_key, {})
-            if uid:
-                self.uid = uid
-                self.models = xmlrpc.client.ServerProxy(f'{self.url}/xmlrpc/2/object')
-                empresas = self.models.execute_kw(self.db, self.uid, self.api_key, 'res.company', 'search_read', [[]], {'fields': ['id', 'name']})
-                self.listado_empresas.clear()
-                self.diccionario_empresas = {e['name']: e['id'] for e in empresas}
-                for nombre in self.diccionario_empresas.keys():
-                    self.listado_empresas.addItem(nombre)
-            else:
-                QMessageBox.critical(self, "Error", "Fallo de autenticación automática.")
-        except Exception as e:
-            QMessageBox.critical(self, "Conexión", f"Error de red: {str(e)}")
+    def _open_edit_tab(self, partner_id: int):
+        """Abre (o reemplaza) la pestaña de edición con el partner dado."""
+        # Cierra la pestaña de edición previa si existe
+        if self._edit_tab_index >= 0:
+            self.tabs.removeTab(self._edit_tab_index)
+            self._edit_tab_index = -1
 
-    def ejecutar_busqueda(self):
-        if not self.uid: return
-        items = self.listado_empresas.selectedItems()
-        ids = [self.diccionario_empresas[i.text()] for i in items]
-        
-        texto = self.input_search.text().strip()
-        domain = [('company_id', 'in', ids)] if ids else [('company_id', '=', False)]
+        edit_tab = TabFormulario(
+            self._service, self._companies, partner_id=partner_id
+        )
+        edit_tab.saved.connect(self._on_edit_saved)
 
-        if texto:
-            domain += ['|', '|', ('name', 'ilike', texto), ('email', 'ilike', texto), ('phone', 'ilike', texto)]
+        idx = self.tabs.addTab(edit_tab, f"✏  Editar #{partner_id}")
+        self._edit_tab_index = idx
+        self.tabs.setCurrentIndex(idx)
 
-        try:
-            contactos = self.models.execute_kw(self.db, self.uid, self.api_key, 'res.partner', 'search_read', [domain], 
-                                              {'fields': ['id', 'name', 'email', 'phone', 'city', 'company_id'], 'limit': 200})
-            self.table.setRowCount(0)
-            for i, c in enumerate(contactos):
-                self.table.insertRow(i)
-                self.table.setItem(i, 0, QTableWidgetItem(str(c.get('id'))))
-                self.table.setItem(i, 1, QTableWidgetItem(str(c.get('name'))))
-                self.table.setItem(i, 2, QTableWidgetItem(str(c.get('email') or "")))
-                self.table.setItem(i, 3, QTableWidgetItem(str(c.get('phone') or "")))
-                self.table.setItem(i, 4, QTableWidgetItem(str(c.get('city') or "")))
-                comp = c.get('company_id')
-                self.table.setItem(i, 5, QTableWidgetItem(comp[1] if isinstance(comp, list) else "Global"))
-        except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
+    def _on_create_saved(self, partner_id: int):
+        if partner_id > 0:
+            self._tab_search.refresh()
+            self.tabs.setCurrentIndex(self.TAB_SEARCH)
+        # Si partner_id == -1 (cancelado) no hacemos nada
 
-    def limpiar_busqueda(self):
-        self.input_search.clear()
-        self.listado_empresas.clearSelection()
-        self.table.setRowCount(0)
+    def _on_edit_saved(self, partner_id: int):
+        # Cierra la pestaña de edición y vuelve a búsqueda
+        if self._edit_tab_index >= 0:
+            self.tabs.removeTab(self._edit_tab_index)
+            self._edit_tab_index = -1
+        if partner_id > 0:
+            self._tab_search.refresh()
+        self.tabs.setCurrentIndex(self.TAB_SEARCH)
 
-if __name__ == '__main__':
+
+# ──────────────────────────────────────────────────────────────────────────── #
+
+if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = GoldStarApp()
     window.show()
