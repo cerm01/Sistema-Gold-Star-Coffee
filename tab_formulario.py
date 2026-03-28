@@ -111,14 +111,8 @@ class TabFormulario(QWidget):
         self.inp_phone.setFixedHeight(40)
         self.inp_phone.setStyleSheet(styles.INPUT_STYLE)
 
-        self.inp_mobile = QLineEdit()
-        self.inp_mobile.setPlaceholderText("+52 33 0000 0000")
-        self.inp_mobile.setFixedHeight(40)
-        self.inp_mobile.setStyleSheet(styles.INPUT_STYLE)
-
         form_contact.addRow("Email",    self.inp_email)
         form_contact.addRow("Teléfono", self.inp_phone)
-        form_contact.addRow("Móvil",    self.inp_mobile)
         card_contact.setLayout(form_contact)
         layout.addWidget(card_contact)
 
@@ -184,7 +178,6 @@ class TabFormulario(QWidget):
         self.inp_name.setText(partner.name)
         self.inp_email.setText(partner.email)
         self.inp_phone.setText(partner.phone)
-        self.inp_mobile.setText(partner.mobile)
         self.inp_street.setText(partner.street)
         self.inp_city.setText(partner.city)
         self.chk_is_company.setChecked(partner.is_company)
@@ -208,7 +201,6 @@ class TabFormulario(QWidget):
             "name":       name,
             "email":      self.inp_email.text().strip()  or False,
             "phone":      self.inp_phone.text().strip()  or False,
-            "mobile":     self.inp_mobile.text().strip() or False,
             "street":     self.inp_street.text().strip() or False,
             "city":       self.inp_city.text().strip()   or False,
             "is_company": self.chk_is_company.isChecked(),

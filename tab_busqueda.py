@@ -142,9 +142,9 @@ class TabBusqueda(QWidget):
 
         # ── Tabla ───────────────────────────────────────────────────────
         self.table = QTableWidget()
-        self.table.setColumnCount(7)
+        self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels(
-            ["ID", "Nombre", "Email", "Teléfono", "Móvil", "Ciudad", "Empresa"]
+            ["ID", "Nombre", "Email", "Teléfono", "Ciudad", "Empresa"]
         )
         self.table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -264,7 +264,7 @@ class TabBusqueda(QWidget):
             self.table.insertRow(i)
             comp_name = c.company_id[1] if isinstance(c.company_id, list) else "—"
             for col, val in enumerate(
-                [str(c.id), c.name, c.email, c.phone, c.mobile, c.city, comp_name]
+                [str(c.id), c.name, c.email, c.phone, c.city, comp_name]
             ):
                 item = QTableWidgetItem(val)
                 item.setData(Qt.ItemDataRole.UserRole, c.id)

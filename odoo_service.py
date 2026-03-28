@@ -22,7 +22,6 @@ class ContactResult:
     name: str
     email: str
     phone: str
-    mobile: str
     city: str
     street: str
     company_id: Any       # [id, name] o False
@@ -100,7 +99,7 @@ class OdooService:
     #  Contactos / Partners                                                #
     # ------------------------------------------------------------------ #
     _PARTNER_FIELDS = [
-        "id", "name", "email", "phone", "mobile",
+        "id", "name", "email", "phone",
         "city", "street", "company_id", "is_company", "active",
     ]
 
@@ -199,7 +198,6 @@ class OdooService:
             name=raw.get("name") or "",
             email=raw.get("email") or "",
             phone=raw.get("phone") or "",
-            mobile=raw.get("mobile") or "",
             city=raw.get("city") or "",
             street=raw.get("street") or "",
             company_id=raw.get("company_id"),
