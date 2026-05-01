@@ -65,7 +65,7 @@ class TabBusqueda(QWidget):
         self.list_companies.setSelectionMode(
             QAbstractItemView.SelectionMode.MultiSelection
         )
-        self.list_companies.setFixedHeight(120)
+        self.list_companies.setMinimumHeight(80)
         self.list_companies.setStyleSheet(styles.LIST_STYLE)
         ec.addWidget(lbl_e)
         ec.addWidget(self.list_companies)
@@ -76,7 +76,7 @@ class TabBusqueda(QWidget):
         lbl_s.setStyleSheet(styles.LABEL_SECTION_STYLE)
         self.input_search = QLineEdit()
         self.input_search.setPlaceholderText("Nombre, Email o Teléfono…")
-        self.input_search.setFixedHeight(44)
+        self.input_search.setMinimumHeight(40)
         self.input_search.setStyleSheet(styles.INPUT_STYLE)
         self.input_search.returnPressed.connect(self._search)
         sc.addWidget(lbl_s)
@@ -87,7 +87,7 @@ class TabBusqueda(QWidget):
         bc = QVBoxLayout()
         bc.addSpacing(22)
         self.btn_search = QPushButton("🔍  BUSCAR")
-        self.btn_search.setFixedHeight(44)
+        self.btn_search.setMinimumHeight(40)
         self.btn_search.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_search.setStyleSheet(
             styles.btn_style(styles.PRIMARY, styles.PRIMARY_DARK)
@@ -95,7 +95,7 @@ class TabBusqueda(QWidget):
         self.btn_search.clicked.connect(self._search)
 
         self.btn_clear = QPushButton("✖  LIMPIAR")
-        self.btn_clear.setFixedHeight(44)
+        self.btn_clear.setMinimumHeight(40)
         self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_clear.setStyleSheet(
             styles.btn_style(styles.GRAY, styles.GRAY_DARK)
@@ -118,7 +118,7 @@ class TabBusqueda(QWidget):
         self.lbl_status.setStyleSheet("color: #777; font-size: 12px;")
 
         self.btn_edit = QPushButton("✏  EDITAR")
-        self.btn_edit.setFixedHeight(36)
+        self.btn_edit.setMinimumHeight(34)
         self.btn_edit.setEnabled(False)
         self.btn_edit.setStyleSheet(
             styles.btn_style(styles.WARNING, "#a0400d")
@@ -126,7 +126,7 @@ class TabBusqueda(QWidget):
         self.btn_edit.clicked.connect(self._edit_selected)
 
         self.btn_delete = QPushButton("🗑  ELIMINAR")
-        self.btn_delete.setFixedHeight(36)
+        self.btn_delete.setMinimumHeight(34)
         self.btn_delete.setEnabled(False)
         self.btn_delete.setStyleSheet(
             styles.btn_style(styles.DANGER, styles.DANGER_DARK)
@@ -168,7 +168,7 @@ class TabBusqueda(QWidget):
         # ── Paginación ──────────────────────────────────────────────────
         pag = QHBoxLayout()
         self.btn_prev = QPushButton("◀  Anterior")
-        self.btn_prev.setFixedHeight(34)
+        self.btn_prev.setMinimumHeight(32)
         self.btn_prev.setEnabled(False)
         self.btn_prev.setStyleSheet(
             styles.btn_style("#e9ecef", "#dee2e6", "#333")
@@ -180,7 +180,7 @@ class TabBusqueda(QWidget):
         self.lbl_page.setStyleSheet("color: #555; font-size: 12px; min-width: 160px;")
 
         self.btn_next = QPushButton("Siguiente  ▶")
-        self.btn_next.setFixedHeight(34)
+        self.btn_next.setMinimumHeight(32)
         self.btn_next.setEnabled(False)
         self.btn_next.setStyleSheet(
             styles.btn_style("#e9ecef", "#dee2e6", "#333")

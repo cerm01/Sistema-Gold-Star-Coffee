@@ -3,22 +3,29 @@ styles.py
 Estilos centralizados para toda la aplicación GoldStar.
 """
 
-# Paleta de colores
-PRIMARY      = "#0078d4"
-PRIMARY_DARK = "#005a9e"
-PRIMARY_LIGHT= "#e7f3ff"
-SUCCESS      = "#107c10"
-SUCCESS_DARK = "#0b5c0b"
-DANGER       = "#d13438"
-DANGER_DARK  = "#a4262c"
-WARNING      = "#ca5010"
-GRAY         = "#6c757d"
-GRAY_DARK    = "#495057"
-BG           = "#f3f4f6"
-CARD_BG      = "#ffffff"
-BORDER       = "#e0e0e0"
-TEXT_MAIN    = "#1a1a2e"
-TEXT_SUB     = "#555"
+# Paleta de colores principal
+PRIMARY       = "#0078d4"
+PRIMARY_DARK  = "#005a9e"
+PRIMARY_LIGHT = "#e7f3ff"
+SUCCESS       = "#107c10"
+SUCCESS_DARK  = "#0b5c0b"
+DANGER        = "#d13438"
+DANGER_DARK   = "#a4262c"
+WARNING       = "#ca5010"
+GRAY          = "#6c757d"
+GRAY_DARK     = "#495057"
+BG            = "#f0f2f5"
+CARD_BG       = "#ffffff"
+BORDER        = "#e0e0e0"
+TEXT_MAIN     = "#1a1a2e"
+TEXT_SUB      = "#555"
+
+# Paleta sidebar
+SIDEBAR_BG     = "#1e2a3b"
+SIDEBAR_HOVER  = "#2d3f56"
+SIDEBAR_ACTIVE = "#0d1f30"
+SIDEBAR_TEXT   = "#8fa8c4"
+SIDEBAR_WIDTH  = 230
 
 APP_STYLE = f"""
     QWidget {{
@@ -46,46 +53,43 @@ APP_STYLE = f"""
     }}
     QScrollBar:vertical {{
         border: none;
-        background: #f0f0f0;
+        background: #e8eaed;
         width: 8px;
         border-radius: 4px;
     }}
     QScrollBar::handle:vertical {{
-        background: #ccc;
+        background: #c0c4cc;
         border-radius: 4px;
-        min-height: 20px;
+        min-height: 24px;
     }}
     QScrollBar::handle:vertical:hover {{
-        background: #aaa;
+        background: #9aa0ac;
     }}
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
         height: 0;
     }}
 """
 
-TAB_STYLE = f"""
-    QTabWidget::pane {{
-        border: none;
+NAV_BTN_STYLE = f"""
+    QPushButton {{
         background: transparent;
+        color: {SIDEBAR_TEXT};
+        text-align: left;
+        padding: 13px 22px;
+        border: none;
+        font-size: 13px;
+        border-radius: 0;
+        border-left: 3px solid transparent;
     }}
-    QTabBar::tab {{
-        background: #e9ecef;
-        padding: 12px 30px;
+    QPushButton:hover {{
+        background: {SIDEBAR_HOVER};
+        color: #d0dce8;
+    }}
+    QPushButton:checked {{
+        background: {SIDEBAR_ACTIVE};
+        color: white;
+        border-left: 3px solid {PRIMARY};
         font-weight: bold;
-        font-size: 12px;
-        border-top-left-radius: 8px;
-        border-top-right-radius: 8px;
-        color: #666;
-        margin-right: 4px;
-    }}
-    QTabBar::tab:selected {{
-        background: white;
-        color: {PRIMARY};
-        border-bottom: 3px solid {PRIMARY};
-    }}
-    QTabBar::tab:hover:!selected {{
-        background: #dee2e6;
-        color: #333;
     }}
 """
 
@@ -171,7 +175,7 @@ LIST_STYLE = f"""
     }}
 """
 
-LABEL_TITLE_STYLE = f"font-size: 24px; font-weight: bold; color: {TEXT_MAIN};"
+LABEL_TITLE_STYLE   = f"font-size: 24px; font-weight: bold; color: {TEXT_MAIN};"
 LABEL_SECTION_STYLE = f"font-weight: bold; color: {TEXT_SUB}; font-size: 12px;"
 
 

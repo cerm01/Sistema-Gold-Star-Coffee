@@ -1,14 +1,15 @@
 """
 tab_dashboard.py
-Pestaña de Dashboard con estadísticas de la base de datos de Odoo.
+Vista Dashboard con estadísticas de la base de datos de Odoo.
+Grid de tarjetas responsivo: 3 → 2 → 1 columnas según ancho de ventana.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QPushButton, QGridLayout, QGraphicsDropShadowEffect,
-    QScrollArea, QProgressBar,
+    QScrollArea, QProgressBar, QSizePolicy,
 )
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 
 import styles
 from workers import StatsWorker
@@ -30,19 +31,21 @@ class StatCard(QFrame):
         sh.setYOffset(4)
         sh.setColor(QColor(0, 0, 0, 20))
         self.setGraphicsEffect(sh)
-        self.setMinimumHeight(110)
+        self.setMinimumHeight(100)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(20, 18, 20, 18)
+        lay.setContentsMargins(20, 16, 20, 16)
 
         icon_lbl = QLabel(icon)
-        icon_lbl.setStyleSheet(f"font-size: 36px;")
-        icon_lbl.setFixedWidth(54)
+        icon_lbl.setStyleSheet("font-size: 34px;")
+        icon_lbl.setFixedWidth(50)
 
         text_lay = QVBoxLayout()
+        text_lay.setSpacing(2)
         self.value_lbl = QLabel(value)
         self.value_lbl.setStyleSheet(
-            f"font-size: 28px; font-weight: bold; color: {accent};"
+            f"font-size: 26px; font-weight: bold; color: {accent};"
         )
         label_lbl = QLabel(label)
         label_lbl.setStyleSheet("font-size: 12px; color: #777;")
@@ -58,20 +61,23 @@ class StatCard(QFrame):
 
 
 class CoverageBar(QWidget):
-    """Mini barra de progreso con etiqueta."""
     def __init__(self, label: str, accent: str):
         super().__init__()
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(4)
+
         top = QHBoxLayout()
         self.lbl = QLabel(label)
         self.lbl.setStyleSheet("font-size: 12px; color: #555;")
         self.pct_lbl = QLabel("—")
-        self.pct_lbl.setStyleSheet(f"font-size: 12px; font-weight: bold; color: {accent};")
+        self.pct_lbl.setStyleSheet(
+            f"font-size: 12px; font-weight: bold; color: {accent};"
+        )
         top.addWidget(self.lbl)
         top.addStretch()
         top.addWidget(self.pct_lbl)
+
         self.bar = QProgressBar()
         self.bar.setFixedHeight(8)
         self.bar.setTextVisible(False)
@@ -97,8 +103,9 @@ class TabDashboard(QWidget):
 
     def __init__(self, service):
         super().__init__()
-        self._service = service
-        self._worker  = None
+        self._service   = service
+        self._worker    = None
+        self._grid_cols = -1
         self._build_ui()
 
     # ------------------------------------------------------------------ #
@@ -112,9 +119,9 @@ class TabDashboard(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         inner = QWidget()
-        layout = QVBoxLayout(inner)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(20)
+        self._inner_layout = QVBoxLayout(inner)
+        self._inner_layout.setContentsMargins(0, 0, 0, 0)
+        self._inner_layout.setSpacing(20)
         scroll.setWidget(inner)
         outer.addWidget(scroll)
 
@@ -125,7 +132,7 @@ class TabDashboard(QWidget):
             f"font-size: 22px; font-weight: bold; color: {styles.TEXT_MAIN};"
         )
         self.btn_refresh = QPushButton("🔄  Actualizar")
-        self.btn_refresh.setFixedHeight(38)
+        self.btn_refresh.setMinimumHeight(38)
         self.btn_refresh.setStyleSheet(
             styles.btn_style(styles.PRIMARY, styles.PRIMARY_DARK)
         )
@@ -133,26 +140,27 @@ class TabDashboard(QWidget):
         hdr.addWidget(title)
         hdr.addStretch()
         hdr.addWidget(self.btn_refresh)
-        layout.addLayout(hdr)
+        self._inner_layout.addLayout(hdr)
 
-        # Stat cards (2×3 grid)
-        grid = QGridLayout()
-        grid.setSpacing(16)
+        # Contenedor del grid (responsivo)
+        self._cards_widget = QWidget()
+        self._cards_widget.setStyleSheet("background: transparent;")
+        self._grid = QGridLayout(self._cards_widget)
+        self._grid.setSpacing(16)
+        self._inner_layout.addWidget(self._cards_widget)
 
-        self.card_total    = StatCard("👥", "Total Contactos",    "—", styles.PRIMARY)
-        self.card_empresas = StatCard("🏢", "Empresas",           "—", "#5c6bc0")
-        self.card_personas = StatCard("🙋", "Personas",           "—", "#00897b")
-        self.card_email    = StatCard("✉️",  "Con Email",          "—", styles.WARNING)
-        self.card_phone    = StatCard("📞", "Con Teléfono",       "—", styles.SUCCESS)
-        self.card_comp_num = StatCard("🏭", "Compañías Odoo",     "—", "#8e24aa")
-
-        grid.addWidget(self.card_total,    0, 0)
-        grid.addWidget(self.card_empresas, 0, 1)
-        grid.addWidget(self.card_personas, 0, 2)
-        grid.addWidget(self.card_email,    1, 0)
-        grid.addWidget(self.card_phone,    1, 1)
-        grid.addWidget(self.card_comp_num, 1, 2)
-        layout.addLayout(grid)
+        # Crear las 6 tarjetas
+        self.card_total    = StatCard("👥", "Total Contactos",  "—", styles.PRIMARY)
+        self.card_empresas = StatCard("🏢", "Empresas",         "—", "#5c6bc0")
+        self.card_personas = StatCard("🙋", "Personas",         "—", "#00897b")
+        self.card_email    = StatCard("✉️",  "Con Email",        "—", styles.WARNING)
+        self.card_phone    = StatCard("📞", "Con Teléfono",     "—", styles.SUCCESS)
+        self.card_comp_num = StatCard("🏭", "Compañías Odoo",   "—", "#8e24aa")
+        self._cards = [
+            self.card_total, self.card_empresas, self.card_personas,
+            self.card_email, self.card_phone,    self.card_comp_num,
+        ]
+        self._reflow_cards(3)  # layout inicial
 
         # Cobertura
         cov_box = QFrame()
@@ -173,18 +181,17 @@ class TabDashboard(QWidget):
         cov_lay = QVBoxLayout(cov_box)
         cov_lay.setContentsMargins(24, 20, 24, 20)
         cov_lay.setSpacing(14)
-
         cov_title = QLabel("📈  Cobertura de Datos")
         cov_title.setStyleSheet("font-size: 15px; font-weight: bold; color: #333;")
         cov_lay.addWidget(cov_title)
 
-        self.bar_email  = CoverageBar("Contactos con Email",    styles.WARNING)
-        self.bar_phone  = CoverageBar("Contactos con Teléfono", styles.SUCCESS)
+        self.bar_email = CoverageBar("Contactos con Email",    styles.WARNING)
+        self.bar_phone = CoverageBar("Contactos con Teléfono", styles.SUCCESS)
         cov_lay.addWidget(self.bar_email)
         cov_lay.addWidget(self.bar_phone)
-        layout.addWidget(cov_box)
+        self._inner_layout.addWidget(cov_box)
 
-        # Lista de compañías Odoo
+        # Lista de compañías
         comp_box = QFrame()
         comp_box.setStyleSheet("""
             QFrame {
@@ -210,9 +217,28 @@ class TabDashboard(QWidget):
         self.companies_container = QVBoxLayout()
         self.companies_container.setSpacing(6)
         comp_lay.addLayout(self.companies_container)
-        layout.addWidget(comp_box)
+        self._inner_layout.addWidget(comp_box)
 
-        layout.addStretch()
+        self._inner_layout.addStretch()
+
+    # ------------------------------------------------------------------ #
+    #  Responsive grid                                                     #
+    # ------------------------------------------------------------------ #
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        w = self.width() - styles.SIDEBAR_WIDTH if self.width() > styles.SIDEBAR_WIDTH else self.width()
+        cols = 3 if self.width() >= 900 else 2 if self.width() >= 560 else 1
+        if cols != self._grid_cols:
+            self._reflow_cards(cols)
+
+    def _reflow_cards(self, cols: int):
+        # Quitar todos los widgets del grid sin eliminarlos
+        for card in self._cards:
+            self._grid.removeWidget(card)
+        # Redistribuir en el nuevo número de columnas
+        for i, card in enumerate(self._cards):
+            self._grid.addWidget(card, i // cols, i % cols)
+        self._grid_cols = cols
 
     # ------------------------------------------------------------------ #
     #  Datos                                                               #
@@ -240,7 +266,6 @@ class TabDashboard(QWidget):
         self.bar_email.set_value(stats["with_email"], total)
         self.bar_phone.set_value(stats["with_phone"], total)
 
-        # Lista de compañías
         while self.companies_container.count():
             item = self.companies_container.takeAt(0)
             if item.widget():

@@ -77,11 +77,11 @@ class TabFormulario(QWidget):
 
         self.inp_name = QLineEdit()
         self.inp_name.setPlaceholderText("Nombre completo o razón social")
-        self.inp_name.setFixedHeight(40)
+        self.inp_name.setMinimumHeight(38)
         self.inp_name.setStyleSheet(styles.INPUT_STYLE)
 
         self.cmb_company = QComboBox()
-        self.cmb_company.setFixedHeight(40)
+        self.cmb_company.setMinimumHeight(38)
         self.cmb_company.setStyleSheet(styles.INPUT_STYLE)
         self.cmb_company.addItem("— Sin empresa —", None)
         for c in self._companies:
@@ -103,12 +103,12 @@ class TabFormulario(QWidget):
 
         self.inp_email  = QLineEdit()
         self.inp_email.setPlaceholderText("correo@ejemplo.com")
-        self.inp_email.setFixedHeight(40)
+        self.inp_email.setMinimumHeight(38)
         self.inp_email.setStyleSheet(styles.INPUT_STYLE)
 
         self.inp_phone  = QLineEdit()
         self.inp_phone.setPlaceholderText("+52 33 0000 0000")
-        self.inp_phone.setFixedHeight(40)
+        self.inp_phone.setMinimumHeight(38)
         self.inp_phone.setStyleSheet(styles.INPUT_STYLE)
 
         form_contact.addRow("Email",    self.inp_email)
@@ -126,12 +126,12 @@ class TabFormulario(QWidget):
 
         self.inp_street = QLineEdit()
         self.inp_street.setPlaceholderText("Calle y número")
-        self.inp_street.setFixedHeight(40)
+        self.inp_street.setMinimumHeight(38)
         self.inp_street.setStyleSheet(styles.INPUT_STYLE)
 
         self.inp_city   = QLineEdit()
         self.inp_city.setPlaceholderText("Ciudad")
-        self.inp_city.setFixedHeight(40)
+        self.inp_city.setMinimumHeight(38)
         self.inp_city.setStyleSheet(styles.INPUT_STYLE)
 
         form_addr.addRow("Calle",  self.inp_street)
@@ -144,14 +144,14 @@ class TabFormulario(QWidget):
         btn_row.addStretch()
 
         self.btn_cancel = QPushButton("Cancelar")
-        self.btn_cancel.setFixedHeight(42)
+        self.btn_cancel.setMinimumHeight(40)
         self.btn_cancel.setMinimumWidth(120)
         self.btn_cancel.setStyleSheet(styles.btn_style(styles.GRAY, styles.GRAY_DARK))
         self.btn_cancel.clicked.connect(self._cancel)
 
         label = "💾  Actualizar" if self._partner_id else "✅  Crear Contacto"
         self.btn_save = QPushButton(label)
-        self.btn_save.setFixedHeight(42)
+        self.btn_save.setMinimumHeight(40)
         self.btn_save.setMinimumWidth(160)
         self.btn_save.setStyleSheet(styles.btn_style(styles.SUCCESS, styles.SUCCESS_DARK))
         self.btn_save.clicked.connect(self._save)
