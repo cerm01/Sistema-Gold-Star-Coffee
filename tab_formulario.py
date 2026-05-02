@@ -2,6 +2,8 @@
 tab_formulario.py
 Pestaña reutilizable para Crear y Editar contactos.
 """
+import random
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLineEdit, QPushButton, QLabel, QGroupBox,
@@ -13,6 +15,15 @@ from PyQt6.QtGui import QColor, QFont
 
 import styles
 from workers import CreatePartnerWorker, UpdatePartnerWorker, LoadPartnerWorker
+
+
+def _generate_ean13(prefix: str = "042") -> str:
+    """Genera un EAN-13 con el prefijo dado y dígito verificador correcto."""
+    body = "".join(str(random.randint(0, 9)) for _ in range(12 - len(prefix)))
+    digits12 = prefix + body
+    total = sum(int(d) * (1 if i % 2 == 0 else 3) for i, d in enumerate(digits12))
+    check = (10 - total % 10) % 10
+    return digits12 + str(check)
 
 
 class TabFormulario(QWidget):
@@ -116,6 +127,46 @@ class TabFormulario(QWidget):
         card_contact.setLayout(form_contact)
         layout.addWidget(card_contact)
 
+        # ── Card: Código de Barras ──────────────────────────────────────
+        card_barcode = QGroupBox("Código de Barras")
+        self._shadow(card_barcode)
+        bc_lay = QVBoxLayout()
+        bc_lay.setContentsMargins(20, 25, 20, 20)
+        bc_lay.setSpacing(10)
+
+        bc_row = QHBoxLayout()
+        bc_row.setSpacing(10)
+
+        self.inp_barcode = QLineEdit()
+        self.inp_barcode.setPlaceholderText("Sin código asignado")
+        self.inp_barcode.setReadOnly(True)
+        self.inp_barcode.setMinimumHeight(38)
+        self.inp_barcode.setStyleSheet(
+            styles.INPUT_STYLE +
+            "QLineEdit { font-family: 'Courier New', monospace; font-size: 15px;"
+            f" letter-spacing: 2px; color: {styles.TEXT_MAIN}; background: #f8f9fa; }}"
+        )
+
+        self.btn_gen_barcode = QPushButton("⚡  Generar EAN-13")
+        self.btn_gen_barcode.setMinimumHeight(38)
+        self.btn_gen_barcode.setMinimumWidth(160)
+        self.btn_gen_barcode.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_gen_barcode.setStyleSheet(
+            styles.btn_style("#5c6bc0", "#3949ab")
+        )
+        self.btn_gen_barcode.clicked.connect(self._generate_barcode)
+
+        bc_row.addWidget(self.inp_barcode, stretch=1)
+        bc_row.addWidget(self.btn_gen_barcode)
+        bc_lay.addLayout(bc_row)
+
+        hint = QLabel("Prefijo 042 · 13 dígitos · Dígito verificador EAN-13")
+        hint.setStyleSheet("font-size: 11px; color: #999;")
+        bc_lay.addWidget(hint)
+
+        card_barcode.setLayout(bc_lay)
+        layout.addWidget(card_barcode)
+
         # ── Card: Dirección ─────────────────────────────────────────────
         card_addr = QGroupBox("Dirección")
         self._shadow(card_addr)
@@ -165,6 +216,9 @@ class TabFormulario(QWidget):
     # ------------------------------------------------------------------ #
     #  Lógica                                                              #
     # ------------------------------------------------------------------ #
+    def _generate_barcode(self):
+        self.inp_barcode.setText(_generate_ean13("042"))
+
     def _load_partner(self, partner_id: int):
         self.btn_save.setEnabled(False)
         self._load_worker = LoadPartnerWorker(self._service, partner_id)
@@ -180,6 +234,7 @@ class TabFormulario(QWidget):
         self.inp_phone.setText(partner.phone)
         self.inp_street.setText(partner.street)
         self.inp_city.setText(partner.city)
+        self.inp_barcode.setText(partner.barcode)
         self.chk_is_company.setChecked(partner.is_company)
 
         if isinstance(partner.company_id, list):
@@ -199,11 +254,12 @@ class TabFormulario(QWidget):
 
         data: dict = {
             "name":       name,
-            "email":      self.inp_email.text().strip()  or False,
-            "phone":      self.inp_phone.text().strip()  or False,
-            "street":     self.inp_street.text().strip() or False,
-            "city":       self.inp_city.text().strip()   or False,
+            "email":      self.inp_email.text().strip()    or False,
+            "phone":      self.inp_phone.text().strip()    or False,
+            "street":     self.inp_street.text().strip()   or False,
+            "city":       self.inp_city.text().strip()     or False,
             "is_company": self.chk_is_company.isChecked(),
+            "barcode":    self.inp_barcode.text().strip()  or False,
         }
         company_id = self.cmb_company.currentData()
         data["company_id"] = company_id if company_id else False

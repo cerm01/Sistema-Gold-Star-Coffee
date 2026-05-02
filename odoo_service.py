@@ -27,6 +27,7 @@ class ContactResult:
     company_id: Any       # [id, name] o False
     is_company: bool
     active: bool
+    barcode: str = ""
 
 
 class OdooServiceError(Exception):
@@ -100,7 +101,7 @@ class OdooService:
     # ------------------------------------------------------------------ #
     _PARTNER_FIELDS = [
         "id", "name", "email", "phone",
-        "city", "street", "company_id", "is_company", "active",
+        "city", "street", "company_id", "is_company", "active", "barcode",
     ]
 
     def search_partners(
@@ -203,4 +204,5 @@ class OdooService:
             company_id=raw.get("company_id"),
             is_company=raw.get("is_company", False),
             active=raw.get("active", True),
+            barcode=raw.get("barcode") or "",
         )
